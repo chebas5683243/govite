@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/CloudyKit/jet/v6"
+	"github.com/alexedwards/scs/v2"
 	"github.com/chebas5683243/govite/render"
+	"github.com/chebas5683243/govite/session"
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
 )
@@ -25,13 +27,16 @@ type GoVite struct {
 	RootPath string
 	Routes   *chi.Mux
 	Render   *render.Render
+	Session  *scs.SessionManager
 	JetViews *jet.Set
 	config   config
 }
 
 type config struct {
-	port     string
-	renderer string
+	port        string
+	renderer    string
+	cookie      cookieConfig
+	sessionType string
 }
 
 func (gv *GoVite) New(rootPath string) error {
@@ -68,7 +73,27 @@ func (gv *GoVite) New(rootPath string) error {
 	gv.config = config{
 		port:     os.Getenv("PORT"),
 		renderer: os.Getenv("RENDERER"),
+		cookie: cookieConfig{
+			name:     os.Getenv("COOKIE_NAME"),
+			lifetime: os.Getenv("COOKIE_LIFETIME"),
+			persist:  os.Getenv("COOKIE_PERSISTS"),
+			secure:   os.Getenv("COOKIE_SECURE"),
+			domain:   os.Getenv("COOKIE_DOMAIN"),
+		},
+		sessionType: os.Getenv("SESSION_TYPE"),
 	}
+
+	// create session
+
+	sess := session.Session{
+		CookieLifetime: gv.config.cookie.lifetime,
+		CookiePersist:  gv.config.cookie.persist,
+		CookieName:     gv.config.cookie.name,
+		CookieDomain:   gv.config.cookie.domain,
+		SessionType:    gv.config.sessionType,
+	}
+
+	gv.Session = sess.InitSession()
 
 	gv.JetViews = jet.NewSet(
 		jet.NewOSFileSystemLoader(fmt.Sprintf("%s/views", rootPath)),

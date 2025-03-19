@@ -15,6 +15,7 @@ func (gv *GoVite) routes() http.Handler {
 		mux.Use(middleware.Logger)
 	}
 	mux.Use(middleware.Recoverer)
+	mux.Use(gv.SessionLoad)
 
 	return mux
 }

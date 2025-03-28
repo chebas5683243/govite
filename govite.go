@@ -28,6 +28,7 @@ type GoVite struct {
 	Routes   *chi.Mux
 	Render   *render.Render
 	Session  *scs.SessionManager
+	DB       Database
 	JetViews *jet.Set
 	config   config
 }
@@ -37,6 +38,7 @@ type config struct {
 	renderer    string
 	cookie      cookieConfig
 	sessionType string
+	database    databaseConfig
 }
 
 func (gv *GoVite) New(rootPath string) error {
@@ -66,6 +68,22 @@ func (gv *GoVite) New(rootPath string) error {
 	gv.InfoLog = infoLog
 	gv.ErrorLog = errorLog
 	gv.Debug, _ = strconv.ParseBool(os.Getenv("DEBUG"))
+
+	// connect to database
+	if os.Getenv("DATABASE_TYPE") != "" {
+		db, err := gv.OpenDB(os.Getenv("DATABASE_TYPE"), gv.BuildDSN())
+
+		if err != nil {
+			errorLog.Println(err)
+			os.Exit(1)
+		}
+
+		gv.DB = Database{
+			DataType: os.Getenv("DATABASE_TYPE"),
+			Pool:     db,
+		}
+	}
+
 	gv.Version = version
 	gv.RootPath = rootPath
 	gv.Routes = gv.routes().(*chi.Mux)
@@ -81,6 +99,10 @@ func (gv *GoVite) New(rootPath string) error {
 			domain:   os.Getenv("COOKIE_DOMAIN"),
 		},
 		sessionType: os.Getenv("SESSION_TYPE"),
+		database: databaseConfig{
+			database: os.Getenv("DATABASE_TYPE"),
+			dsn:      gv.BuildDSN(),
+		},
 	}
 
 	// create session
@@ -130,6 +152,8 @@ func (gv *GoVite) ListenAndServe() {
 		WriteTimeout: 600 * time.Second,
 	}
 
+	defer gv.DB.Pool.Close()
+
 	gv.InfoLog.Printf("Listening on port %s", gv.config.port)
 	err := srv.ListenAndServe()
 	gv.ErrorLog.Fatal(err)
@@ -161,4 +185,26 @@ func (gv *GoVite) createRenderer() {
 		Port:     gv.config.port,
 		JetViews: gv.JetViews,
 	}
+}
+
+func (gv *GoVite) BuildDSN() string {
+	var dsn string
+
+	switch os.Getenv("DATABASE_TYPE") {
+	case "postgres", "postgresql":
+		dsn = fmt.Sprintf("host=%s port=%s user=%s dbname=%s sslmode=%s timezone=UTC connect_timeout=5",
+			os.Getenv("DATABASE_HOST"),
+			os.Getenv("DATABASE_PORT"),
+			os.Getenv("DATABASE_USER"),
+			os.Getenv("DATABASE_NAME"),
+			os.Getenv("DATABASE_SSL_MODE"))
+
+		if os.Getenv("DATABASE_PASS") != "" {
+			dsn = fmt.Sprintf("%s password=%s", dsn, os.Getenv("DATABASE_PASS"))
+		}
+
+	default:
+	}
+
+	return dsn
 }

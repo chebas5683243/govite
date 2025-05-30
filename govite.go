@@ -184,6 +184,7 @@ func (gv *GoVite) createRenderer() {
 		RootPath: gv.RootPath,
 		Port:     gv.config.port,
 		JetViews: gv.JetViews,
+		Session:  gv.Session,
 	}
 }
 

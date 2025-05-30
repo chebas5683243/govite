@@ -8,4 +8,4 @@ coverage:
 	@go test -cover ./...
 
 build_cli:
-	@go build -o ../myapp/celeritas ./cmd/cli
+	@go build -o ../myapp/govite ./cmd/cli
